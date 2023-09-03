@@ -2,3 +2,5 @@
 target/
 *.iml
 profileData.txt
+.DS_Store
+**/.DS_Store
