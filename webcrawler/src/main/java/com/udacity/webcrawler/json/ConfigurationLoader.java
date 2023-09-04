@@ -50,7 +50,7 @@ public final class ConfigurationLoader {
       // Prevent Auto Close
       objectMapper.disable(JsonParser.Feature.AUTO_CLOSE_SOURCE);
       return objectMapper.readValue(reader, CrawlerConfiguration.class);
-    } catch(Exception e) {
+    } catch(IOException e) {
       System.err.println("Error Reading Configuration File: " + e.getLocalizedMessage());
     }
     // Return Default Configuration
