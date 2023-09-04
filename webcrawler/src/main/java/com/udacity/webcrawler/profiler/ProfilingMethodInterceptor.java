@@ -1,8 +1,11 @@
 package com.udacity.webcrawler.profiler;
 
 import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Objects;
 
 /**
@@ -12,19 +15,49 @@ import java.util.Objects;
 final class ProfilingMethodInterceptor implements InvocationHandler {
 
   private final Clock clock;
+  private final Object delegate;
+  private final ProfilingState state;
 
-  // TODO: You will need to add more instance fields and constructor arguments to this class.
-  ProfilingMethodInterceptor(Clock clock) {
+  ProfilingMethodInterceptor(Clock clock, Object delegate, ProfilingState state) {
     this.clock = Objects.requireNonNull(clock);
+    this.delegate = delegate;
+    this.state = state;
   }
 
   @Override
-  public Object invoke(Object proxy, Method method, Object[] args) {
-    // TODO: This method interceptor should inspect the called method to see if it is a profiled
-    //       method. For profiled methods, the interceptor should record the start time, then
-    //       invoke the method using the object that is being profiled. Finally, for profiled
-    //       methods, the interceptor should record how long the method call took, using the
-    //       ProfilingState methods.
-    return null;
+  public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+    // Output
+    Object result = null;
+    Instant startTime = null;
+    boolean isProfileAnnotation = method.getAnnotation(Profiled.class) != null;
+
+    // Start Counting
+    if(isProfileAnnotation){
+      startTime = clock.instant();
+    }
+
+    try {
+      // Invoke Method
+      result = method.invoke(this.delegate, args);
+    }
+    // Propagate InvocationTargetException
+    catch (InvocationTargetException ex) {
+      System.err.println("Method Profiling InvocationTargetException: " + ex.getLocalizedMessage());
+      throw ex.getTargetException();
+    }
+    // Propagate IllegalAccessException
+    catch (IllegalAccessException ex) {
+      System.err.println("Method Profiling IllegalAccessException: " + ex.getLocalizedMessage());
+      throw new RuntimeException(ex);
+    }
+    // Compute Performance
+    finally {
+      // Compute Time Diff
+      if(isProfileAnnotation) {
+        Duration duration = Duration.between(startTime, clock.instant());
+        state.record(this.delegate.getClass(), method, duration);
+      }
+    }
+    return result;
   }
 }

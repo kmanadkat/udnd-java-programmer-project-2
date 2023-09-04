@@ -1,8 +1,12 @@
 package com.udacity.webcrawler.profiler;
 
 import javax.inject.Inject;
+import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.Writer;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.ZonedDateTime;
@@ -29,17 +33,38 @@ final class ProfilerImpl implements Profiler {
   public <T> T wrap(Class<T> klass, T delegate) {
     Objects.requireNonNull(klass);
 
-    // TODO: Use a dynamic proxy (java.lang.reflect.Proxy) to "wrap" the delegate in a
-    //       ProfilingMethodInterceptor and return a dynamic proxy from this method.
-    //       See https://docs.oracle.com/javase/10/docs/api/java/lang/reflect/Proxy.html.
+    // Get All Class Methods
+    Method[] methods = klass.getMethods();
+    if(methods.length == 0) {
+      throw new IllegalArgumentException("Class does not have any methods");
+    }
 
-    return delegate;
+    // Check If any method is annotated with @Profiled
+    boolean isAnnotated = false;
+    for (Method method : methods) {
+      if(method.getAnnotation(Profiled.class) != null){
+        isAnnotated = true;
+        break;
+      }
+    }
+    if(!isAnnotated) {
+      throw new IllegalArgumentException("No class method has @Profiled Annotation");
+    }
+
+    // Create Interceptor
+    ProfilingMethodInterceptor interceptor = new ProfilingMethodInterceptor(clock, delegate, state);
+
+    // Return Proxy
+    return klass.cast(Proxy.newProxyInstance(klass.getClassLoader(), new Class[]{klass}, interceptor));
   }
 
   @Override
   public void writeData(Path path) {
-    // TODO: Write the ProfilingState data to the given file path. If a file already exists at that
-    //       path, the new data should be appended to the existing file.
+    try(BufferedWriter writer = Files.newBufferedWriter(path)) {
+      writeData(writer);
+    } catch(IOException e){
+      System.err.println("Error Writing Profile At Path: " + e.getLocalizedMessage());
+    }
   }
 
   @Override
